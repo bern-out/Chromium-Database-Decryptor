@@ -74,7 +74,7 @@ def get_cookies(cursor: sqlite3.Cursor, output_file: str|None):
     print_cookies(rows)
 
 
-def parse_cookie(row):
+def build_cookie(row):
     name, enc_value, domain, path, expires, is_secure, is_httponly, samesite = row
 
     value = decrypt_cookie(enc_value, APP_BOUND_KEY)
@@ -86,6 +86,8 @@ def parse_cookie(row):
         "secure": bool(is_secure),
         "httpOnly": bool(is_httponly),
         "sameSite": map_same_site(samesite),
+        "session": expires == 0,
+        "storeId": None
     }
 
     if expires:
@@ -116,10 +118,10 @@ def print_passwords(rows):
 
 def map_same_site(value: int):
     return {
-        -1: None,
-        0: "None",
-        1: "Lax",
-        3: "Strict"
+        -1: "unspecified",
+        0: "no_restriction",
+        1: "lax",
+        3: "strict"
     }.get(value)
 
 
@@ -133,7 +135,7 @@ def print_cookies(rows: sqlite3.Cursor):
     cookies = []
 
     for row in rows:
-        cookie = parse_cookie(row)
+        cookie = build_cookie(row)
         cookies.append(cookie)
 
     print(cookies)
@@ -162,22 +164,7 @@ def export_cookies_json_file(file: str, rows):
     cookies = []
 
     for row in rows:
-        name, enc_value, domain, path, expires, is_secure, is_httponly, samesite = row
-
-        value = decrypt_cookie(enc_value, APP_BOUND_KEY)
-        cookie = {
-            "name": name,
-            "domain": domain,
-            "value": value,
-            "path": path,
-            "secure": bool(is_secure),
-            "httpOnly": bool(is_httponly),
-            "sameSite": map_same_site(samesite),
-        }
-
-        if expires:
-            cookie["expirationDate"] = chromium_time_to_unix(expires)
-
+        cookie = build_cookie(row)
         cookies.append(cookie)
 
     with open(file, "w", encoding="utf-8") as f:
