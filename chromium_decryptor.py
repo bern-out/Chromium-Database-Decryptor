@@ -22,19 +22,28 @@ def decrypt_password(blob: bytes, key: bytes) -> str:
 
 
 def decrypt_cookie(blob: bytes, key: bytes):
-    if not blob.startswith(b'v20'):
-        print("Skipped entry: not v10/v20 or too small.")
+    if blob is None or len(blob) < 19:
         return None
 
-    iv = blob[3:15]
-    ciphertext = blob[15:-16]
-    tag = blob[-16:]
+    if blob.startswith(b'v20'):
+        iv = blob[3:15]
+        ciphertext = blob[15:-16]
+        tag = blob[-16:]
+        cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
+        decrypted = cipher.decrypt_and_verify(ciphertext, tag)
+        return decrypted[32:].decode('utf-8', errors='replace')  # strip 32-byte App-Bound prefix
 
-    cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
-    decrypted = cipher.decrypt_and_verify(ciphertext, tag)
-    cookie = decrypted[32:]
+    elif blob.startswith(b'v10'):
+        iv = blob[3:15]
+        ciphertext = blob[15:-16]
+        tag = blob[-16:]
+        cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
+        decrypted = cipher.decrypt_and_verify(ciphertext, tag)
+        return decrypted.decode('utf-8', errors='replace')  # sem strip no v10
 
-    return cookie.decode('utf-8', errors='replace')
+    else:
+        print("Skipped entry: formato desconhecido.")
+        return None
 
 
 
